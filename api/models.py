@@ -129,8 +129,6 @@ class Shop(models.Model):
         verbose_name='статус получения заказов', default=True
     )
 
-    # filename
-
     class Meta:
         """Shop meta."""
 
@@ -385,7 +383,7 @@ class ConfirmEmailToken(models.Model):
     key = models.CharField(_("Key"), max_length=64, db_index=True, unique=True)
 
     def save(self, *args, **kwargs) -> None:
-        """TODO."""
+        """Save token."""
         if not self.key:
             self.key = self.generate_key()
         return super(ConfirmEmailToken, self).save(*args, **kwargs)

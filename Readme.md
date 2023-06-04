@@ -8,7 +8,7 @@ django-admin startproject orders .
 python manage.py startapp api
 python manage.py makemigrations
 
-
+python manage.py migrate
 python manage.py runserver
 
 2. Этап 2. Проработка моделей данных

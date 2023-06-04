@@ -1,0 +1,49 @@
+@base_url=http://127.0.0.1:8000
+
+###
+POST {{base_url}}/user/register
+Content-Type: application/json
+
+{
+    "first_name": "ser2",
+    "last_name":"ser2",
+    "email":"asd2@asd.com",
+    "password":"asd12322",
+    "company":"asd",
+    "position":"1"
+}
+
+
+###
+POST {{base_url}}/user/register/confirm
+Content-Type: application/json
+
+{
+    "token":"5acecf21ec1bd9d756de7bbea92dca9de6dcd51796",
+    "email":"asd2@asd.com",
+    "password":"asd12322"
+}
+
+
+
+### login
+# @name postLogin
+POST {{base_url}}/user/login
+Content-Type: application/json
+
+{
+    "password":"asd12322",
+    "email":"asd2@asd.com"
+}
+
+###
+@token = {{postLogin.response.body.Token}}
+
+###
+POST {{base_url}}/partner/update
+Content-Type: application/json
+Authorization: Token {{token}}
+
+{
+    "url": "https://github.com/SergeyMMedvedev/final-diplom/blob/main/shop1.yaml"
+}

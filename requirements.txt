@@ -5,3 +5,7 @@ djangorestframework
 django-filter
 markdown
 django-rest-passwordreset
+requests
+pyyaml
+ujson
+django-allauth
