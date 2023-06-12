@@ -50,13 +50,14 @@ def new_user_registered_signal(user_id, **kwargs) -> None:
         # title:
         f"Password Reset Token for {token.user.email}",
         # message:
-        token.key,
+        (f'Перейдите по ссылке для подтверждения:\n'
+         f'{settings.SERVER_HOST}user/register/confirm'
+         f'?token={token.key}&email={token.user.email}'),
         # from:
         settings.EMAIL_HOST_USER,
         # to:
         [token.user.email],
     )
-    print('msg', msg)
     msg.send()
 
 

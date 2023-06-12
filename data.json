@@ -1,0 +1,348 @@
+[
+    {
+        "model": "api.user",
+        "pk": 21,
+        "fields": {
+            "password": "pbkdf2_sha256$600000$ztaq79tcRCbw0r1ZgF9iuF$KhbtiKXCMb14BBDu4QC3BJbCZuPIuNBnKeKlXWIBlPs=",
+            "last_login": "2023-06-10T11:01:14.068Z",
+            "is_superuser": true,
+            "first_name": "",
+            "last_name": "",
+            "is_staff": true,
+            "date_joined": "2023-06-04T17:20:26.548Z",
+            "email": "asd@asd.com",
+            "company": "",
+            "position": "",
+            "username": "asd@asd.com",
+            "is_active": true,
+            "type": "shop",
+            "groups": [],
+            "user_permissions": []
+        }
+    },
+    {
+        "model": "api.user",
+        "pk": 71,
+        "fields": {
+            "password": "pbkdf2_sha256$600000$HfiZ3IrU0nswqiVeVAD7Ac$xeWCWh8VQBnspdGcRKp6wSDniNtsxBxB0wwW7ovPfTY=",
+            "last_login": null,
+            "is_superuser": false,
+            "first_name": "ser2",
+            "last_name": "ser2",
+            "is_staff": false,
+            "date_joined": "2023-06-12T15:09:24Z",
+            "email": "medvedevsm1989@yandex.ru",
+            "company": "asd",
+            "position": "1",
+            "username": "sdf",
+            "is_active": true,
+            "type": "shop",
+            "groups": [],
+            "user_permissions": []
+        }
+    },
+    {
+        "model": "api.shop",
+        "pk": 3,
+        "fields": {
+            "name": "Связной",
+            "url": null,
+            "user": 71,
+            "state": true
+        }
+    },
+    {
+        "model": "api.category",
+        "pk": 1,
+        "fields": {
+            "name": "Flash-накопители",
+            "shops": [
+                3
+            ]
+        }
+    },
+    {
+        "model": "api.category",
+        "pk": 15,
+        "fields": {
+            "name": "Аксессуары",
+            "shops": [
+                3
+            ]
+        }
+    },
+    {
+        "model": "api.category",
+        "pk": 224,
+        "fields": {
+            "name": "Смартфоны",
+            "shops": [
+                3
+            ]
+        }
+    },
+    {
+        "model": "api.product",
+        "pk": 1,
+        "fields": {
+            "name": "Смартфон Apple iPhone XS Max 512GB (золотистый)",
+            "category": 224
+        }
+    },
+    {
+        "model": "api.product",
+        "pk": 2,
+        "fields": {
+            "name": "Смартфон Apple iPhone XR 256GB (красный)",
+            "category": 224
+        }
+    },
+    {
+        "model": "api.product",
+        "pk": 3,
+        "fields": {
+            "name": "Смартфон Apple iPhone XR 256GB (черный)",
+            "category": 224
+        }
+    },
+    {
+        "model": "api.product",
+        "pk": 4,
+        "fields": {
+            "name": "Смартфон Apple iPhone XR 128GB (синий)",
+            "category": 224
+        }
+    },
+    {
+        "model": "api.productinfo",
+        "pk": 9,
+        "fields": {
+            "model": "apple/iphone/xs-max",
+            "external_id": 4216292,
+            "product": 1,
+            "shop": 3,
+            "quantity": 14,
+            "price": 110000,
+            "price_rrc": 116990
+        }
+    },
+    {
+        "model": "api.productinfo",
+        "pk": 10,
+        "fields": {
+            "model": "apple/iphone/xr",
+            "external_id": 4216313,
+            "product": 2,
+            "shop": 3,
+            "quantity": 9,
+            "price": 65000,
+            "price_rrc": 69990
+        }
+    },
+    {
+        "model": "api.productinfo",
+        "pk": 11,
+        "fields": {
+            "model": "apple/iphone/xr",
+            "external_id": 4216226,
+            "product": 3,
+            "shop": 3,
+            "quantity": 5,
+            "price": 65000,
+            "price_rrc": 69990
+        }
+    },
+    {
+        "model": "api.productinfo",
+        "pk": 12,
+        "fields": {
+            "model": "apple/iphone/xr",
+            "external_id": 4672670,
+            "product": 4,
+            "shop": 3,
+            "quantity": 7,
+            "price": 60000,
+            "price_rrc": 64990
+        }
+    },
+    {
+        "model": "api.parameter",
+        "pk": 1,
+        "fields": {
+            "name": "Диагональ (дюйм)"
+        }
+    },
+    {
+        "model": "api.parameter",
+        "pk": 2,
+        "fields": {
+            "name": "Разрешение (пикс)"
+        }
+    },
+    {
+        "model": "api.parameter",
+        "pk": 3,
+        "fields": {
+            "name": "Встроенная память (Гб)"
+        }
+    },
+    {
+        "model": "api.parameter",
+        "pk": 4,
+        "fields": {
+            "name": "Цвет"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 33,
+        "fields": {
+            "product_info": 9,
+            "parameter": 1,
+            "value": "6.5"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 34,
+        "fields": {
+            "product_info": 9,
+            "parameter": 2,
+            "value": "2688x1242"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 35,
+        "fields": {
+            "product_info": 9,
+            "parameter": 3,
+            "value": "512"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 36,
+        "fields": {
+            "product_info": 9,
+            "parameter": 4,
+            "value": "золотистый"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 37,
+        "fields": {
+            "product_info": 10,
+            "parameter": 1,
+            "value": "6.1"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 38,
+        "fields": {
+            "product_info": 10,
+            "parameter": 2,
+            "value": "1792x828"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 39,
+        "fields": {
+            "product_info": 10,
+            "parameter": 3,
+            "value": "256"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 40,
+        "fields": {
+            "product_info": 10,
+            "parameter": 4,
+            "value": "красный"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 41,
+        "fields": {
+            "product_info": 11,
+            "parameter": 1,
+            "value": "6.1"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 42,
+        "fields": {
+            "product_info": 11,
+            "parameter": 2,
+            "value": "1792x828"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 43,
+        "fields": {
+            "product_info": 11,
+            "parameter": 3,
+            "value": "256"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 44,
+        "fields": {
+            "product_info": 11,
+            "parameter": 4,
+            "value": "черный"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 45,
+        "fields": {
+            "product_info": 12,
+            "parameter": 1,
+            "value": "6.1"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 46,
+        "fields": {
+            "product_info": 12,
+            "parameter": 2,
+            "value": "1792x828"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 47,
+        "fields": {
+            "product_info": 12,
+            "parameter": 3,
+            "value": "256"
+        }
+    },
+    {
+        "model": "api.productparameter",
+        "pk": 48,
+        "fields": {
+            "product_info": 12,
+            "parameter": 4,
+            "value": "синий"
+        }
+    },
+    {
+        "model": "authtoken.token",
+        "pk": "e56b933431f136c811525f8c489ab316604b4c9d",
+        "fields": {
+            "user": 71,
+            "created": "2023-06-12T15:09:40.121Z"
+        }
+    }
+]

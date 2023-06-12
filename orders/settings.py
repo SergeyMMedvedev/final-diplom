@@ -134,17 +134,20 @@ STATIC_URL = "static/"
 AUTH_USER_MODEL = 'api.User'
 
 # EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# # EMAIL_USE_TLS = True
-
-# EMAIL_HOST = 'smtp.mail.ru'
-# EMAIL_HOST_USER = 'netology-pdiplom@mail.ru'
-# EMAIL_HOST_PASSWORD = 'i~8W4rdRPFlo'
-# EMAIL_PORT = '465'
+# EMAIL_HOST = os.getenv('EMAIL_HOST')
+# EMAIL_PORT = os.getenv('EMAIL_PORT')
 # EMAIL_USE_SSL = True
+# EMAIL_USE_TLS = False
+
+# EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+# EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+
+# DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # SERVER_EMAIL = EMAIL_HOST_USER
+# EMAIL_ADMIN = EMAIL_HOST_USER
 
+SERVER_HOST = os.getenv('SERVER_HOST')
 EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
-
 EMAIL_FILE_PATH = os.path.join(BASE_DIR, "sent_emails")
 
 REST_FRAMEWORK = {

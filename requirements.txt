@@ -9,3 +9,5 @@ requests
 pyyaml
 ujson
 django-allauth
+pytest
+pytest-django

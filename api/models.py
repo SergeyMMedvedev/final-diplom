@@ -52,14 +52,14 @@ class UserManager(BaseUserManager):
         self, email: str, password: str, **extra_fields
     ) -> BaseUserManager:
         """Create superuser."""
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-
+        for param in ['is_staff', 'is_superuser', 'is_active']:
+            extra_fields.setdefault(param, True)
         if extra_fields.get('is_staff') is not True:
             raise ValueError('Superuser must have is_staff=True.')
         if extra_fields.get('is_superuser') is not True:
             raise ValueError('Superuser must have is_superuser=True.')
-
+        if extra_fields.get('is_active') is not True:
+            raise ValueError('Superuser must have is_active=True.')
         return self._create_user(email, password, **extra_fields)
 
 
@@ -105,7 +105,7 @@ class User(AbstractUser):
     )
 
     def __str__(self) -> str:
-        return f'{self.first_name} {self.last_name}'
+        return f'{self.pk}: {self.first_name} {self.last_name}'
 
     class Meta:
         """User meta."""

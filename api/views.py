@@ -6,8 +6,11 @@ from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import IntegrityError
 from django.db.models import F, Q, Sum
+from django.shortcuts import get_list_or_404, get_object_or_404
 from requests import get
+from rest_framework import mixins, status, viewsets
 from rest_framework.authtoken.models import Token
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -26,6 +29,7 @@ from api.models import (
     ProductInfo,
     ProductParameter,
     Shop,
+    User,
 )
 from api.serializers import (
     CategorySerializer,
@@ -34,157 +38,124 @@ from api.serializers import (
     OrderSerializer,
     ProductInfoSerializer,
     ShopSerializer,
+    UserCreateSerializer,
+    UserLoginSerializer,
     UserSerializer,
 )
 from api.signals import new_order, new_user_registered
+
+from .permissions import IsAuthenticated
 
 
 class RegisterAccount(APIView):
     """Для регистрации покупателей."""
 
-    def post(self, request, *args, **kwargs) -> Response:
+    def post(self, request) -> Response:
         """Регистрация методом POST."""
-        # проверяем обязательные аргументы
-        if {
-            'first_name',
-            'last_name',
-            'email',
-            'password',
-            'company',
-            'position',
-        }.issubset(request.data):
-            # проверяем пароль на сложность
-
-            try:
-                validate_password(request.data['password'])
-            except Exception as password_error:
-                error_array = []
-                # noinspection PyTypeChecker
-                for item in password_error:
-                    error_array.append(item)
-                return Response({'Status': False, 'Errors': {'password': error_array}})
-            else:
-                # проверяем данные для уникальности имени пользователя
-                # request.data._mutable = True
-                request.data.update({})
-                user_serializer = UserSerializer(data=request.data)
-                if user_serializer.is_valid():
-                    # сохраняем пользователя
-                    user = user_serializer.save()
-                    user.set_password(request.data['password'])
-                    user.save()
-                    new_user_registered.send(
-                        sender=self.__class__, user_id=user.id
-                    )
-                    return Response({'Status': True})
-                else:
-                    return Response(
-                        {'Status': False, 'Errors': user_serializer.errors}
-                    )
-        return Response(
-            {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, 
-        )
+        user_serializer = UserCreateSerializer(data=request.data)
+        if user_serializer.is_valid():
+            user = user_serializer.save()
+            user.set_password(request.data['password'])
+            user.save()
+            new_user_registered.send(sender=self.__class__, user_id=user.id)
+            return Response({'Status': True})
+        else:
+            return Response(
+                {'Status': False, 'Errors': user_serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class ConfirmAccount(APIView):
     """Класс для подтверждения почтового адреса."""
 
-    def post(self, request, *args, **kwargs) -> Response:
-        """Регистрация методом POST."""
-        # проверяем обязательные аргументы
-        if {'email', 'token'}.issubset(request.data):
-            token = ConfirmEmailToken.objects.filter(
-                user__email=request.data['email'], key=request.data['token']
-            ).first()
-            if token:
-                token.user.is_active = True
-                token.user.save()
-                token.delete()
-                return Response({'Status': True})
-            else:
-                return Response(
-                    {
-                        'Status': False,
-                        'Errors': 'Неправильно указан токен или email',
-                    }
-                )
-
-        return Response(
-            {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
-        )
-
-
-class AccountDetails(APIView):
-    """Класс для работы данными пользователя."""
-
-    def get(self, request, *args, **kwargs) -> Response:
-        """получить данные."""
-        if not request.user.is_authenticated:
+    def get(self, request) -> Response:
+        """Подтверждение регистрации по ссылке из почты."""
+        confirmation_code = request.GET.get('token')
+        email = request.GET.get('email')
+        if not all([confirmation_code, email]):
             return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
+                {
+                    'Status': False,
+                    'Errors': 'Не указаны все необходимые аргументы',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
-
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
-
-    def post(self, request, *args, **kwargs) -> Response:
-        """Редактирование методом POST."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-        # проверяем обязательные аргументы
-
-        if 'password' in request.data:
-            # проверяем пароль на сложность
-            try:
-                validate_password(request.data['password'])
-            except Exception as password_error:
-                return Response(
-                    {'Status': False, 'Errors': {'password': password_error}}
-                )
-            else:
-                request.user.set_password(request.data['password'])
-
-        # проверяем остальные данные
-        user_serializer = UserSerializer(
-            request.user, data=request.data, partial=True
-        )
-        if user_serializer.is_valid():
-            user_serializer.save()
+        token = ConfirmEmailToken.objects.filter(
+            user__email=email, key=confirmation_code
+        ).first()
+        if token:
+            token.user.is_active = True
+            token.user.save()
+            token.delete()
             return Response({'Status': True})
         else:
             return Response(
-                {'Status': False, 'Errors': user_serializer.errors}
+                {
+                    'Status': False,
+                    'Errors': 'Неправильно указан токен или email',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class AccountDetails(
+    mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
+):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+    def get_object(self) -> User:
+        """Returns the User the view is displaying."""
+        user = get_object_or_404(
+            self.queryset, username=self.kwargs.get('username')
+        )
+        return user
+
+    @action(
+        methods=['GET', 'PATCH'],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+    )
+    def details(self, request, *args, **kwargs) -> Response:
+        """Получить информацию о себе."""
+        user = self.request.user
+        if request.method == 'PATCH':
+            kwargs['partial'] = True
+            partial = kwargs.pop('partial', False)
+            serializer = self.get_serializer(
+                user, data=request.data, partial=partial
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        serializer = self.get_serializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class LoginAccount(APIView):
     """Класс для авторизации пользователей."""
 
-    def post(self, request, *args, **kwargs) -> Response:
+    def post(self, request) -> Response:
         """Авторизация методом POST."""
-        if {'email', 'password'}.issubset(request.data):
-
-            user = authenticate(
-                request,
-                username=request.data['email'],
-                password=request.data['password'],
-            )
-
-
-            if user is not None:
-                if user.is_active:
-                    token, _ = Token.objects.get_or_create(user=user)
-
-                    return Response({'Status': True, 'Token': token.key})
-
+        user_serializer = UserLoginSerializer(data=request.data)
+        if not user_serializer.is_valid():
             return Response(
-                {'Status': False, 'Errors': 'Не удалось авторизовать'}
+                {'Status': False, 'Errors': user_serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+        user = authenticate(
+            request,
+            username=request.data['email'],
+            password=request.data['password'],
+        )
+        if user is not None:
+            if user.is_active:
+                token, _ = Token.objects.get_or_create(user=user)
+                return Response({'Status': True, 'Token': token.key})
 
         return Response(
-            {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
+            {'Status': False, 'Errors': 'Не удалось авторизовать'},
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
 
@@ -265,9 +236,11 @@ class BasketView(APIView):
             )
 
         items_sting = request.data.get('items')
+        print('items_sting', items_sting)
         if items_sting:
             try:
                 items_dict = load_json(items_sting)
+                print('items_dict', items_dict)
             except ValueError:
                 return Response(
                     {'Status': False, 'Errors': 'Неверный формат запроса'}
@@ -394,7 +367,7 @@ class PartnerUpdate(APIView):
                 stream = get(url).content
 
                 data = load_yaml(stream, Loader=Loader)
-
+                print('data', data)
                 shop, _ = Shop.objects.get_or_create(
                     name=data['shop'], user_id=request.user.pk
                 )
@@ -540,7 +513,7 @@ class ContactView(APIView):
             )
 
         if {'city', 'street', 'phone'}.issubset(request.data):
-            request.data._mutable = True
+            # request.data._mutable = True
             request.data.update({'user': request.user.id})
             serializer = ContactSerializer(data=request.data)
 
@@ -548,9 +521,7 @@ class ContactView(APIView):
                 serializer.save()
                 return Response({'Status': True})
             else:
-                return Response(
-                    {'Status': False, 'Errors': serializer.errors}
-                )
+                return Response({'Status': False, 'Errors': serializer.errors})
 
         return Response(
             {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
@@ -613,7 +584,7 @@ class ContactView(APIView):
 
 
 class OrderView(APIView):
-    """Класс для получения и размешения заказов пользователями."""
+    """Класс для получения и размещения заказов пользователями."""
 
     def get(self, request, *args, **kwargs) -> Response:
         """получить мои заказы."""
