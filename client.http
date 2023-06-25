@@ -223,3 +223,53 @@ Authorization: Token {{token}}
 {
     "contact": 37
 }
+
+
+
+
+
+
+
+###
+POST http://localhost/user/login
+Content-Type: application/json
+
+{
+    "password":"admin7712345",
+    "email":"admin77@admin.com"
+}
+
+@token=6f7c10f769689097ef81e1702754c46c75b828ac
+
+###
+POST http://localhost/partner/update
+Content-Type: application/json
+Authorization: Token {{token}}
+
+{
+    "url": "https://raw.githubusercontent.com/netology-code/python-final-diplom/master/data/shop1.yaml"
+}
+###
+
+POST http://localhost/user/register
+Content-Type: application/json
+
+{
+    "first_name": "ser2",
+    "last_name":"ser2",
+    "email":"medvedevsm1989@yandex.ru",
+    "password":"asd12322",
+    "company":"asd",
+    "position":"1"
+}
+
+###
+POST http://localhost/user/login
+Content-Type: application/json
+
+{
+    "password":"asd12322",
+    "email":"medvedevsm1989@yandex.ru"
+}
+###
+@token = a29edd5df839b0f242c1352e2a1d13a8266d78c5

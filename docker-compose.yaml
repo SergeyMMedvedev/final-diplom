@@ -6,10 +6,13 @@ volumes:
 services:
   postgresql:
     image: postgres:13.1
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
+    ### Смонтировать том:
+    # volumes:
+    #   - postgres_data:/var/lib/postgresql/data/
     env_file:
       - ./.env
+    ports:
+      - "5431:5432"
 
   web:
     build: .

@@ -102,7 +102,7 @@ Authorization: Token {{token}}
 ### 4. Создать пользователя-клиента RegisterAccount
 
 ```
-POST {{base_url}}/user/register
+POST http://localhost/user/register
 Content-Type: application/json
 
 {
@@ -165,6 +165,88 @@ Content-Type: application/json
 ```
 Authorization: Token {{token}}
 ```
+### 7. Посмотреть категории CategoryView
+```
+GET http://localhost/categories
+Content-Type: application/json
+```
+
+### 8. Посмотреть магазины ShopView
+```
+GET http://localhost/shops
+Content-Type: application/json
+```
+
+### 9. Посмотреть товары
+```
+GET http://localhost/products
+Content-Type: application/json
+```
+
+### 10. Добавить контакты
+
+```
+POST http://localhost/user/contact/
+Content-Type: application/json
+Authorization: Token {{token}}
+
+{
+    "city":"Moscow",
+    "street":"street 1",
+    "house":"452",
+    "structure":"1",
+    "building":"1",
+    "apartment":"33",
+    "phone": "88005553555"
+}
+```
+### 11. Получить контакты
+```
+GET http://localhost/user/contact/
+Content-Type: application/json
+Authorization: Token {{token}}
+```
+
+### 12. Создать корзину
+
+```
+POST http://localhost/basket
+Content-Type: application/json
+Authorization: Token {{token}}
+
+
+[{"product_info":11,"quantity": 1},{"product_info":12,"quantity": 1}]
+```
+
+### 13. Создать заказ
+```
+POST http://localhost/order
+Content-Type: application/json
+Authorization: Token {{token}}
+
+{
+    "contact": 37
+}
+```
+
+### 14. Просмотр заказа поставщиком
+```
+POST http://localhost/user/login
+Content-Type: application/json
+
+{
+    "password":"admin7712345",
+    "email":"admin77@admin.com"
+}
+```
+
+```
+GET http://localhost/partner/orders
+Content-Type: application/json
+Authorization: Token {{token}}
+```
+---
+Также готовые примеры запросов можно посмотреть [в файле client.http](https://github.com/SergeyMMedvedev/final-diplom/blob/main/client.http).
 
 ## Пример конфигурации виртуального окружения с использованием реального почтового сервера
 
