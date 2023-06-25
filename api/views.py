@@ -1,20 +1,20 @@
 from distutils.util import strtobool
 
 from django.contrib.auth import authenticate
-from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import IntegrityError
 from django.db.models import F, Q, Sum
-from django.shortcuts import get_list_or_404, get_object_or_404
+from django.db.models.manager import BaseManager
+from django.shortcuts import get_object_or_404
 from requests import get
 from rest_framework import mixins, status, viewsets
 from rest_framework.authtoken.models import Token
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
-from ujson import loads as load_json
 from yaml import Loader
 from yaml import load as load_yaml
 
@@ -34,8 +34,11 @@ from api.models import (
 from api.serializers import (
     CategorySerializer,
     ContactSerializer,
+    OrderDelSerializer,
     OrderItemSerializer,
+    OrderItemUpdSerializer,
     OrderSerializer,
+    OrderUpdSerializer,
     ProductInfoSerializer,
     ShopSerializer,
     UserCreateSerializer,
@@ -44,11 +47,13 @@ from api.serializers import (
 )
 from api.signals import new_order, new_user_registered
 
-from .permissions import IsAuthenticated
+from .permissions import IsAuthenticated, IsShopOwner
 
 
 class RegisterAccount(APIView):
     """Для регистрации покупателей."""
+
+    throttle_classes = [UserRateThrottle]
 
     def post(self, request) -> Response:
         """Регистрация методом POST."""
@@ -68,6 +73,8 @@ class RegisterAccount(APIView):
 
 class ConfirmAccount(APIView):
     """Класс для подтверждения почтового адреса."""
+
+    throttle_classes = [UserRateThrottle]
 
     def get(self, request) -> Response:
         """Подтверждение регистрации по ссылке из почты."""
@@ -99,41 +106,10 @@ class ConfirmAccount(APIView):
             )
 
 
-class AccountDetails(
-    mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
-):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-
-    def get_object(self) -> User:
-        """Returns the User the view is displaying."""
-        user = get_object_or_404(
-            self.queryset, username=self.kwargs.get('username')
-        )
-        return user
-
-    @action(
-        methods=['GET', 'PATCH'],
-        detail=False,
-        permission_classes=[IsAuthenticated],
-    )
-    def details(self, request, *args, **kwargs) -> Response:
-        """Получить информацию о себе."""
-        user = self.request.user
-        if request.method == 'PATCH':
-            kwargs['partial'] = True
-            partial = kwargs.pop('partial', False)
-            serializer = self.get_serializer(
-                user, data=request.data, partial=partial
-            )
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-        serializer = self.get_serializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
 class LoginAccount(APIView):
     """Класс для авторизации пользователей."""
+
+    throttle_classes = [UserRateThrottle]
 
     def post(self, request) -> Response:
         """Авторизация методом POST."""
@@ -159,203 +135,50 @@ class LoginAccount(APIView):
         )
 
 
-class CategoryView(ListAPIView):
-    """Класс для просмотра категорий."""
+class AccountDetails(
+    mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
+):
+    """Класс для получения или изменения пользовательских данных."""
 
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    throttle_classes = [UserRateThrottle]
 
-
-class ShopView(ListAPIView):
-    """Класс для просмотра списка магазинов."""
-
-    queryset = Shop.objects.filter(state=True)
-    serializer_class = ShopSerializer
-
-
-class ProductInfoView(APIView):
-    """Класс для поиска товаров."""
-
-    def get(self, request, *args, **kwargs) -> Response:
-        """Get products."""
-        query = Q(shop__state=True)
-        shop_id = request.query_params.get('shop_id')
-        category_id = request.query_params.get('category_id')
-
-        if shop_id:
-            query = query & Q(shop_id=shop_id)
-
-        if category_id:
-            query = query & Q(product__category_id=category_id)
-
-        # фильтруем и отбрасываем дуликаты
-        queryset = (
-            ProductInfo.objects.filter(query)
-            .select_related('shop', 'product__category')
-            .prefetch_related('product_parameters__parameter')
-            .distinct()
+    def get_object(self) -> User:
+        """Возвращает пользователя, которого отображает представление."""
+        user = get_object_or_404(
+            self.queryset, username=self.kwargs.get('username')
         )
+        return user
 
-        serializer = ProductInfoSerializer(queryset, many=True)
-
-        return Response(serializer.data)
-
-
-class BasketView(APIView):
-    """Класс для работы с корзиной пользователя."""
-
-    def get(self, request, *args, **kwargs) -> Response:
-        """получить корзину."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
+    @action(
+        methods=['GET', 'PATCH'],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+    )
+    def details(self, request, *args, **kwargs) -> Response:
+        """Получить/изменить информацию о себе."""
+        user = self.request.user
+        if request.method == 'PATCH':
+            kwargs['partial'] = True
+            partial = kwargs.pop('partial', False)
+            serializer = self.get_serializer(
+                user, data=request.data, partial=partial
             )
-        basket = (
-            Order.objects.filter(user_id=request.user.id, state='basket')
-            .prefetch_related(
-                'ordered_items__product_info__product__category',
-                'ordered_items__product_info__product_parameters__parameter',
-            )
-            .annotate(
-                total_sum=Sum(
-                    F('ordered_items__quantity')
-                    * F('ordered_items__product_info__price')
-                )
-            )
-            .distinct()
-        )
-
-        serializer = OrderSerializer(basket, many=True)
-        return Response(serializer.data)
-
-    def post(self, request, *args, **kwargs) -> Response:
-        """редактировать корзину."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-
-        items_sting = request.data.get('items')
-        print('items_sting', items_sting)
-        if items_sting:
-            try:
-                items_dict = load_json(items_sting)
-                print('items_dict', items_dict)
-            except ValueError:
-                return Response(
-                    {'Status': False, 'Errors': 'Неверный формат запроса'}
-                )
-            else:
-                basket, _ = Order.objects.get_or_create(
-                    user_id=request.user.id, state='basket'
-                )
-                objects_created = 0
-                for order_item in items_dict:
-                    order_item.update({'order': basket.pk})
-                    serializer = OrderItemSerializer(data=order_item)
-                    if serializer.is_valid():
-                        try:
-                            serializer.save()
-                        except IntegrityError as error:
-                            return Response(
-                                {'Status': False, 'Errors': str(error)}
-                            )
-                        else:
-                            objects_created += 1
-
-                    else:
-                        return Response(
-                            {'Status': False, 'Errors': serializer.errors}
-                        )
-
-                return Response(
-                    {'Status': True, 'Создано объектов': objects_created}
-                )
-        return Response(
-            {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
-        )
-
-    def delete(self, request, *args, **kwargs) -> Response:
-        """удалить товары из корзины."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-
-        items_sting = request.data.get('items')
-        if items_sting:
-            items_list = items_sting.split(',')
-            basket, _ = Order.objects.get_or_create(
-                user_id=request.user.id, state='basket'
-            )
-            query = Q()
-            objects_deleted = False
-            for order_item_id in items_list:
-                if order_item_id.isdigit():
-                    query = query | Q(order_id=basket.pk, id=order_item_id)
-                    objects_deleted = True
-
-            if objects_deleted:
-                deleted_count = OrderItem.objects.filter(query).delete()[0]
-                return Response(
-                    {'Status': True, 'Удалено объектов': deleted_count}
-                )
-        return Response(
-            {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
-        )
-
-    def put(self, request, *args, **kwargs) -> Response:
-        """добавить позиции в корзину."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-
-        items_sting = request.data.get('items')
-        if items_sting:
-            try:
-                items_dict = load_json(items_sting)
-            except ValueError:
-                return Response(
-                    {'Status': False, 'Errors': 'Неверный формат запроса'}
-                )
-            else:
-                basket, _ = Order.objects.get_or_create(
-                    user_id=request.user.id, state='basket'
-                )
-                objects_updated = 0
-                for order_item in items_dict:
-                    if (
-                        type(order_item['id']) == int
-                        and type(order_item['quantity']) == int
-                    ):
-                        objects_updated += OrderItem.objects.filter(
-                            order_id=basket.pk, id=order_item['id']
-                        ).update(quantity=order_item['quantity'])
-
-                return Response(
-                    {'Status': True, 'Обновлено объектов': objects_updated}
-                )
-        return Response(
-            {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
-        )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        serializer = self.get_serializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class PartnerUpdate(APIView):
     """Класс для обновления прайса от поставщика."""
 
+    permission_classes = [IsAuthenticated, IsShopOwner]  # noqa: F811
+    throttle_classes = [UserRateThrottle]
+
     def post(self, request, *args, **kwargs) -> Response:
         """Create price."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-        print(request.user)
-        if request.user.type != 'shop':  # type: ignore
-            return Response(
-                {'Status': False, 'Error': 'Только для магазинов'}, status=403
-            )
-
         url = request.data.get('url')  # type: ignore
         if url:
             validate_url = URLValidator()
@@ -367,7 +190,6 @@ class PartnerUpdate(APIView):
                 stream = get(url).content
 
                 data = load_yaml(stream, Loader=Loader)
-                print('data', data)
                 shop, _ = Shop.objects.get_or_create(
                     name=data['shop'], user_id=request.user.pk
                 )
@@ -409,66 +231,213 @@ class PartnerUpdate(APIView):
         )
 
 
+class CategoryView(ListAPIView):
+    """Класс для просмотра категорий."""
+
+    throttle_classes = [UserRateThrottle]
+
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+
+class ShopView(ListAPIView):
+    """Класс для просмотра списка магазинов."""
+
+    throttle_classes = [UserRateThrottle]
+
+    queryset = Shop.objects.filter(state=True)
+    serializer_class = ShopSerializer
+
+
+class ProductInfoView(APIView):
+    """Класс для поиска товаров."""
+
+    throttle_classes = [UserRateThrottle]
+
+    def get(self, request, *args, **kwargs) -> Response:
+        """Получить товары."""
+        query = Q(shop__state=True)
+        shop_id = request.query_params.get('shop_id')
+        category_id = request.query_params.get('category_id')
+
+        if shop_id:
+            query = query & Q(shop_id=shop_id)
+
+        if category_id:
+            query = query & Q(product__category_id=category_id)
+
+        queryset = (
+            ProductInfo.objects.filter(query)
+            .select_related('shop', 'product__category')
+            .prefetch_related('product_parameters__parameter')
+            .distinct()
+        )
+
+        serializer = ProductInfoSerializer(queryset, many=True)
+
+        return Response(serializer.data)
+
+
+class ContactView(viewsets.ModelViewSet):
+    """Класс для работы с контактами покупателей."""
+
+    throttle_classes = [UserRateThrottle]
+    queryset = Contact.objects.all()
+    serializer_class = ContactSerializer
+    permission_classes = [
+        IsAuthenticated,
+    ]  # noqa: F811
+
+    def get_queryset(self) -> BaseManager[Contact] | list:
+        """Get queryset for current user."""
+        if self.request.user.is_anonymous:
+            return []
+        lookups = Q(user=self.request.user)
+        queryset = self.queryset.filter(lookups)
+        return queryset
+
+    def perform_create(self, serializer) -> None:
+        """Set current user for create."""
+        user = self.request.user
+        serializer.save(user=user)
+
+    def perform_update(self, serializer) -> None:
+        """Set current user for upd."""
+        user = self.request.user
+        serializer.save(user=user)
+
+
 class PartnerState(APIView):
+    permission_classes = [IsAuthenticated, IsShopOwner]  # noqa: F811
+    throttle_classes = [UserRateThrottle]
     """Класс для работы со статусом поставщика."""
 
     def get(self, request, *args, **kwargs) -> Response:
-        """получить текущий статус."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-
-        if request.user.type != 'shop':
-            return Response(
-                {'Status': False, 'Error': 'Только для магазинов'}, status=403
-            )
-
+        """Получить текущий статус."""
         shop = request.user.shop
         serializer = ShopSerializer(shop)
         return Response(serializer.data)
 
-    def post(self, request, *args, **kwargs) -> Response:
-        """изменить текущий статус."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-
-        if request.user.type != 'shop':
-            return Response(
-                {'Status': False, 'Error': 'Только для магазинов'}, status=403
-            )
+    def post(self, request) -> Response:
+        """Изменить текущий статус."""
         state = request.data.get('state')
-        if state:
-            try:
-                Shop.objects.filter(user_id=request.user.id).update(
-                    state=strtobool(state)
-                )
-                return Response({'Status': True})
-            except ValueError as error:
-                return Response({'Status': False, 'Errors': str(error)})
+        data = {**request.data, "name": request.user.shop.name}
+        if not isinstance(state, bool):
+            data['state'] = strtobool(state)
+        serializer = ShopSerializer(data=data)  # type: ignore
+        if not serializer.is_valid():
+            return Response(
+                {'Status': False, 'Errors': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer.update(instance=request.user.shop, validated_data=data)
+        return Response({'Status': True})
 
+
+class BasketView(APIView):
+    """Класс для работы с корзиной пользователя."""
+
+    permission_classes = [IsAuthenticated]  # noqa: F811
+    throttle_classes = [UserRateThrottle]
+
+    def get(self, request, *args, **kwargs) -> Response:
+        """получить корзину."""
+        basket = (
+            Order.objects.filter(user_id=request.user.id, state='basket')
+            .prefetch_related(
+                'ordered_items__product_info__product__category',
+                'ordered_items__product_info__product_parameters__parameter',
+            )
+            .annotate(
+                total_sum=Sum(
+                    F('ordered_items__quantity')
+                    * F('ordered_items__product_info__price')
+                ),
+            )
+            .distinct()
+            .first()
+        )
+        serializer = OrderSerializer(basket)
+        return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs) -> Response:
+        """редактировать корзину."""
+        basket, _ = Order.objects.get_or_create(
+            user_id=request.user.id, state='basket'
+        )
+        for order_item in request.data:
+            order_item.update({'order': basket.pk})
+        serializer = OrderItemSerializer(data=request.data, many=True)
+        if not serializer.is_valid():
+            return Response(
+                {'Status': False, 'Errors': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            serializer.save()
+        except IntegrityError as error:
+            return Response({'Status': False, 'Errors': str(error)})
+        return Response(
+            {'Status': True, 'Создано объектов': len(request.data)}
+        )
+
+    def delete(self, request, *args, **kwargs) -> Response:
+        """удалить товары из корзины."""
+        serializer = OrderDelSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {'Status': False, 'Errors': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        basket, _ = Order.objects.get_or_create(
+            user_id=request.user.id, state='basket'
+        )
+        query = Q()
+        objects_deleted = False
+        for order_item_id in request.data.get('ordered_items', []):
+            query = query | Q(order_id=basket.pk, id=order_item_id)
+            objects_deleted = True
+
+        if objects_deleted:
+            deleted_count = OrderItem.objects.filter(query).delete()[0]
+            return Response(
+                {'Status': True, 'Удалено объектов': deleted_count}
+            )
         return Response(
             {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
+        )
+
+    def put(self, request, *args, **kwargs) -> Response:
+        """добавить позиции в корзину."""
+        serializer = OrderItemUpdSerializer(data=request.data, many=True)
+        if not serializer.is_valid():
+            return Response(
+                {'Status': False, 'Errors': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        basket, _ = Order.objects.get_or_create(
+            user_id=request.user.id, state='basket'
+        )
+        objects_updated = 0
+        for order_item in request.data:
+            objects_updated += OrderItem.objects.filter(
+                order_id=basket.pk, id=order_item['id']
+            ).update(quantity=order_item['quantity'])
+
+        return Response(
+            {'Status': True, 'Обновлено объектов': objects_updated}
         )
 
 
 class PartnerOrders(APIView):
     """Класс для получения заказов поставщиками."""
 
+    permission_classes = [IsAuthenticated, IsShopOwner]  # noqa: F811
+    throttle_classes = [UserRateThrottle]
+
     def get(self, request, *args, **kwargs) -> Response:
-        """Get PartnerOrders."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-
-        if request.user.type != 'shop':
-            return Response(
-                {'Status': False, 'Error': 'Только для магазинов'}, status=403
-            )
-
+        """Get Partner Orders."""
         order = (
             Order.objects.filter(
                 ordered_items__product_info__shop__user_id=request.user.id
@@ -487,111 +456,20 @@ class PartnerOrders(APIView):
             )
             .distinct()
         )
-
         serializer = OrderSerializer(order, many=True)
         return Response(serializer.data)
-
-
-class ContactView(APIView):
-    """Класс для работы с контактами покупателей."""
-
-    def get(self, request, *args, **kwargs) -> Response:
-        """получить мои контакты."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-        contact = Contact.objects.filter(user_id=request.user.id)
-        serializer = ContactSerializer(contact, many=True)
-        return Response(serializer.data)
-
-    def post(self, request, *args, **kwargs) -> Response:
-        """добавить новый контакт."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-
-        if {'city', 'street', 'phone'}.issubset(request.data):
-            # request.data._mutable = True
-            request.data.update({'user': request.user.id})
-            serializer = ContactSerializer(data=request.data)
-
-            if serializer.is_valid():
-                serializer.save()
-                return Response({'Status': True})
-            else:
-                return Response({'Status': False, 'Errors': serializer.errors})
-
-        return Response(
-            {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
-        )
-
-    def delete(self, request, *args, **kwargs) -> Response:
-        """удалить контакт."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-
-        items_sting = request.data.get('items')
-        if items_sting:
-            items_list = items_sting.split(',')
-            query = Q()
-            objects_deleted = False
-            for contact_id in items_list:
-                if contact_id.isdigit():
-                    query = query | Q(user_id=request.user.id, id=contact_id)
-                    objects_deleted = True
-
-            if objects_deleted:
-                deleted_count = Contact.objects.filter(query).delete()[0]
-                return Response(
-                    {'Status': True, 'Удалено объектов': deleted_count}
-                )
-        return Response(
-            {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
-        )
-
-    def put(self, request, *args, **kwargs) -> Response:
-        """редактировать контакт."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
-
-        if 'id' in request.data:
-            if request.data['id'].isdigit():
-                contact = Contact.objects.filter(
-                    id=request.data['id'], user_id=request.user.id
-                ).first()
-                print(contact)
-                if contact:
-                    serializer = ContactSerializer(
-                        contact, data=request.data, partial=True
-                    )
-                    if serializer.is_valid():
-                        serializer.save()
-                        return Response({'Status': True})
-                    else:
-                        return Response(
-                            {'Status': False, 'Errors': serializer.errors}
-                        )
-
-        return Response(
-            {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
-        )
 
 
 class OrderView(APIView):
     """Класс для получения и размещения заказов пользователями."""
 
+    permission_classes = [
+        IsAuthenticated,
+    ]  # noqa: F811
+    throttle_classes = [UserRateThrottle]
+
     def get(self, request, *args, **kwargs) -> Response:
         """получить мои заказы."""
-        if not request.user.is_authenticated:
-            return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
-            )
         order = (
             Order.objects.filter(user_id=request.user.id)
             .exclude(state='basket')
@@ -608,38 +486,28 @@ class OrderView(APIView):
             )
             .distinct()
         )
-
         serializer = OrderSerializer(order, many=True)
         return Response(serializer.data)
 
     def post(self, request, *args, **kwargs) -> Response:
         """разместить заказ из корзины."""
-        if not request.user.is_authenticated:
+        serializer = OrderUpdSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'Status': False, 'Errors': serializer.errors})
+        try:
+            is_updated = Order.objects.filter(
+                user_id=request.user.id, state='basket'
+            ).update(contact_id=request.data['contact'], state='new')
+        except IntegrityError as error:
+            print(error)
             return Response(
-                {'Status': False, 'Error': 'Log in required'}, status=403
+                {
+                    'Status': False,
+                    'Errors': 'Неправильно указаны аргументы',
+                }
             )
-
-        if {'id', 'contact'}.issubset(request.data):
-            if request.data['id'].isdigit():
-                try:
-                    is_updated = Order.objects.filter(
-                        user_id=request.user.id, id=request.data['id']
-                    ).update(contact_id=request.data['contact'], state='new')
-                except IntegrityError as error:
-                    print(error)
-                    return Response(
-                        {
-                            'Status': False,
-                            'Errors': 'Неправильно указаны аргументы',
-                        }
-                    )
-                else:
-                    if is_updated:
-                        new_order.send(
-                            sender=self.__class__, user_id=request.user.id
-                        )
-                        return Response({'Status': True})
-
-        return Response(
-            {'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}
-        )
+        else:
+            if is_updated:
+                new_order.send(sender=self.__class__, user_id=request.user.id)
+                return Response({'Status': True})
+        return Response({'Status': False})

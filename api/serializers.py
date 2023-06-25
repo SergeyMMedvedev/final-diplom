@@ -13,6 +13,7 @@ from api.models import (
     ProductParameter,
     Shop,
     User,
+    STATE_CHOICES
 )
 
 
@@ -110,6 +111,8 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ShopSerializer(serializers.ModelSerializer):
+    state = serializers.BooleanField()
+
     class Meta:
         """ShopSerializer Meta."""
 
@@ -170,6 +173,27 @@ class ProductInfoSerializer(serializers.ModelSerializer):
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    product_info = serializers.PrimaryKeyRelatedField(queryset=ProductInfo.objects.all())
+    quantity = serializers.IntegerField(min_value=1, max_value=1000, default=1)
+                       
+    class Meta:
+        """OrderItemSerializer Meta."""
+
+        model = OrderItem
+        fields = (
+            'id',
+            'product_info',
+            'quantity',
+            'order',
+        )
+        read_only_fields = ('id',)
+        extra_kwargs = {'order': {'write_only': True}}
+
+
+class OrderItemUpdSerializer(serializers.ModelSerializer):
+    id = serializers.PrimaryKeyRelatedField(queryset=OrderItem.objects.all())
+    quantity = serializers.IntegerField(min_value=1, max_value=1000, default=1)
+
     class Meta:
         """OrderItemSerializer Meta."""
 
@@ -190,8 +214,8 @@ class OrderItemCreateSerializer(OrderItemSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     ordered_items = OrderItemCreateSerializer(read_only=True, many=True)
-
-    total_sum = serializers.IntegerField()
+    state = serializers.CharField(required=False, read_only=True)
+    total_sum = serializers.IntegerField(required=False, read_only=True)
     contact = ContactSerializer(read_only=True)
 
     class Meta:
@@ -207,3 +231,23 @@ class OrderSerializer(serializers.ModelSerializer):
             'contact',
         )
         read_only_fields = ('id',)
+
+
+class OrderUpdSerializer(OrderSerializer):
+    contact = serializers.IntegerField()
+
+
+class OrderDelSerializer(serializers.ModelSerializer):
+    ordered_items = serializers.ListField(
+        child=serializers.IntegerField(min_value=0, max_value=1000)
+    )
+
+    class Meta:
+        """OrderSerializer Meta."""
+
+        model = Order
+        fields = (
+            'id',
+            'ordered_items'
+        )
+        read_only_fields = ('id', 'ordered_items')

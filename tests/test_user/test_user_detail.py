@@ -9,6 +9,12 @@ from tests.common import (
 
 
 class Test02UserDetail:
+    """
+    Тестирование получения или изменения пользовательских данных.
+
+    Используется:
+     - AccountDetails
+    """
     @pytest.mark.django_db(transaction=True)
     def test_01_get_user_detail(self, user_client: Client) -> None:
         """Пользователь получает свои данные."""

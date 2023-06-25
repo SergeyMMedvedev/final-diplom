@@ -109,7 +109,7 @@ class User(AbstractUser):
 
     class Meta:
         """User meta."""
-
+        
         verbose_name = 'Пользователь'
         verbose_name_plural = "Список пользователей"
         ordering = ('email',)
@@ -283,7 +283,7 @@ class Contact(models.Model):
 
     class Meta:
         """Contact meta."""
-
+        ordering = ['-id']
         verbose_name = 'Контакты пользователя'
         verbose_name_plural = "Список контактов пользователя"
 

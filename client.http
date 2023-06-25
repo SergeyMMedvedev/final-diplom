@@ -1,6 +1,8 @@
 @base_url=http://127.0.0.1:8000
+@base_url=http://localhost
+@products_url=https://raw.githubusercontent.com/netology-code/python-final-diplom/master/data/shop1.yaml
 
-### Этап 4 Регистрация
+### 1. RegisterAccount
 POST {{base_url}}/user/register
 Content-Type: application/json
 
@@ -13,7 +15,7 @@ Content-Type: application/json
     "position":"1"
 }
 
-### Этап 4 Регистрация не валидная
+### 1. RegisterAccount (не валидная)
 POST {{base_url}}/user/register
 Content-Type: application/json
 
@@ -27,7 +29,7 @@ Content-Type: application/json
 }
 
 
-### Этап 4 Вход
+### 2. LoginAccount
 # @name postLogin
 POST {{base_url}}/user/login
 Content-Type: application/json
@@ -40,7 +42,7 @@ Content-Type: application/json
 ###
 @token = {{postLogin.response.body.Token}}
 
-### Этап 4 Невалидный Вход
+### 2. LoginAccount (не валидный)
 # @name postLogin
 POST {{base_url}}/user/login
 Content-Type: application/json
@@ -49,17 +51,16 @@ Content-Type: application/json
 
 }
 
-### Этап 4 получить инфу о себе
+### 3. AccountDetails
 GET {{base_url}}/user/details
 Content-Type: application/json
 Authorization: Token {{token}}
 
-### Этап 4 не авторизованный не может получить инфу о себе
+### 3. AccountDetails (не валидный)
 GET {{base_url}}/user/details
 Content-Type: application/json
 
-###
-### Этап 4 получить инфу о себе
+### 3. AccountDetails
 PATCH {{base_url}}/user/details/
 Content-Type: application/json
 Authorization: Token {{token}}
@@ -69,18 +70,7 @@ Authorization: Token {{token}}
     "password": "asd12322new"
 }
 
-### Этап 4 Вход  полсе обновления
-# @name postLogin
-POST {{base_url}}/user/login
-Content-Type: application/json
-
-{
-    "password":"asd12322new",
-    "email":"medvedevsm1989@yandex.ru"
-}
-
-
-### Этап 4 Вход  полсе обновления
+### 3. LoginAccount after change AccountDetails
 # @name postLogin2
 POST {{base_url}}/user/login
 Content-Type: application/json
@@ -92,60 +82,40 @@ Content-Type: application/json
 
 ###
 @tokenadm = {{postLogin.response.body.Token}}
-### Этап 3 заполнение из yaml
+
+### 4. PartnerUpdate
 POST {{base_url}}/partner/update
 Content-Type: application/json
 Authorization: Token {{token}}
 
 {
-    "url": "https://raw.githubusercontent.com/netology-code/python-final-diplom/master/data/shop1.yaml"
+    "url": "{{products_url}}"
 }
 
-### Просмотреть категории
+### 5. CategoryView
 GET {{base_url}}/categories
 Content-Type: application/json
 
-### Просмотреть магазинов
+### 6. ShopView
 GET {{base_url}}/shops
 Content-Type: application/json
 
-### Просмотреть products
+### 7. ProductInfoView
 GET {{base_url}}/products?category_id=1
 Content-Type: application/json
 
 
-### Этап 4 Список товаров
+### 7. ProductInfoView
 GET {{base_url}}/products
 Content-Type: application/json
 
-
-### Этап 4 Карточка товара ?????????
-GET {{base_url}}/products
-Content-Type: application/json
-
-
-### Этап 4 Корзина GET
-GET {{base_url}}/basket
+### 8. ContactView
+GET {{base_url}}/user/contact/
 Content-Type: application/json
 Authorization: Token {{token}}
 
-### Этап 4 Корзина POST
-POST {{base_url}}/basket
-Content-Type: application/json
-Authorization: Token {{token}}
-
-{
-    "items": "[{\"product_info\":5,\"quantity\":1,\"shop\":\"Связной\"}]"
-}
-
-### Получить контакты
-GET {{base_url}}/user/contact
-Content-Type: application/json
-Authorization: Token {{token}}
-
-
-### Заполнить контакты 
-POST {{base_url}}/user/contact
+### 8. ContactView
+POST {{base_url}}/user/contact/
 Content-Type: application/json
 Authorization: Token {{token}}
 
@@ -156,6 +126,100 @@ Authorization: Token {{token}}
     "structure":"1",
     "building":"1",
     "apartment":"33",
-    "user": 35,
-    "phone": "89853662581"
+    "phone": "88005553555"
+}
+
+### 8. ContactView
+PATCH  {{base_url}}/user/contact/36/
+Content-Type: application/json
+Authorization: Token {{token}}
+
+{
+    "city":"zzz2",
+    "street":"street 1",
+    "house":"452",
+    "structure":"1",
+    "building":"1",
+    "apartment":"33",
+    "phone": "88005553555"
+}
+
+### 8. ContactView
+DELETE  {{base_url}}/user/contact/36/
+Content-Type: application/json
+Authorization: Token {{token}}
+
+### 9. PartnerState
+GET {{base_url}}/partner/state
+Content-Type: application/json
+Authorization: Token {{token}}
+
+### 9. PartnerState
+POST {{base_url}}/partner/state
+Content-Type: application/json
+Authorization: Token {{token}}
+
+{
+    "state": true
+}
+
+### 10. BasketView
+GET {{base_url}}/basket
+Content-Type: application/json
+Authorization: Token {{token}}
+
+### 10. BasketView
+POST {{base_url}}/basket
+Content-Type: application/json
+Authorization: Token {{token}}
+
+
+[{"product_info":11,"quantity": 1},{"product_info":12,"quantity": 1}]
+
+
+### 10. BasketView
+POST {{base_url}}/basket
+Content-Type: application/json
+Authorization: Token {{token}}
+
+
+[{"product_info":"45fghfghfg","quantity": 1}]
+
+
+### 10. BasketView
+DELETE {{base_url}}/basket
+Content-Type: application/json
+Authorization: Token {{token}}
+
+{
+    "ordered_items": [101, 100]
+}
+
+### 10. BasketView
+PUT {{base_url}}/basket
+Content-Type: application/json
+Authorization: Token {{token}}
+
+[{"id":100,"quantity":1}]
+
+
+### 11. PartnerOrders
+GET {{base_url}}/partner/orders
+Content-Type: application/json
+Authorization: Token {{token}}
+
+### 12. OrderView
+
+GET {{base_url}}/order
+Content-Type: application/json
+Authorization: Token {{token}}
+
+### 12. OrderView
+
+POST {{base_url}}/order
+Content-Type: application/json
+Authorization: Token {{token}}
+
+{
+    "contact": 37
 }

@@ -13,6 +13,14 @@ from tests.common import (
 
 
 class Test01UserAPI:
+    """
+    Тестирование регистрации, подтверждения и авторизации пользователя.
+
+    Тестируются позитивные и негативные сценарии. Участвуют:
+     - RegisterAccount
+     - ConfirmAccount
+     - LoginAccount
+    """
     @pytest.mark.django_db(transaction=True)
     def test_01_create_user(self, client: Client) -> None:
         """Пользователь регистрируется."""

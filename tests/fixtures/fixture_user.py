@@ -1,18 +1,27 @@
+import json
+from typing import Callable
+
 import pytest
 from django.core import mail
 from django.http import HttpResponse
 from django.test import Client
 from rest_framework.test import APIClient
 
-from tests.common import login_data, user_data
 from api.models import (
-    User,
-    Shop,
     Category,
+    Parameter,
     Product,
     ProductInfo,
-    Parameter,
     ProductParameter,
+    Shop,
+    User,
+)
+from tests.common import (
+    login_data,
+    owner_data,
+    owner_login_data,
+    user_contacts,
+    user_data,
 )
 
 
@@ -27,7 +36,9 @@ def admin(django_user_model):
 def create_and_confirm_user(client: Client) -> HttpResponse:
     """Создать пользователя и подтвердить email."""
     client.post('/user/register', data=user_data)
-    mail_message = mail.outbox[0].message()
+    mail_message = [
+        mail for mail in mail.outbox if user_data['email'] in mail.to
+    ][0].message()
     confirm_url = str(mail_message).strip().split('\n')[-1]
     return client.get(confirm_url)
 
@@ -36,7 +47,7 @@ def create_and_confirm_user(client: Client) -> HttpResponse:
 def user_client(
     admin, client: Client, upd_login_data: dict | None = None
 ) -> Client:
-    """asd."""
+    """Клиент с правами пользователя."""
     if upd_login_data:
         for k, v in upd_login_data:
             login_data[k] = v
@@ -51,25 +62,68 @@ def user_client(
 
 
 @pytest.fixture
-def owner():
-    return User.objects.create(
-        **{
-            "password": "asdQAZ123",
-            "is_superuser": False,
-            "first_name": "ser2",
-            "last_name": "ser2",
-            "email": "medvedevsm1989@yandex.ru",
-            "company": "asd",
-            "position": "1",
-            "username": "sdf",
-            "is_active": True,
-            "type": "shop",
-        }
-    )
+def create_basket() -> Callable:
+    """Возвращает функцию заполнения корзины."""
+    def create_basket_(user_client: Client) -> int:
+        response = user_client.get('/products')
+        order_items = []
+        price = 0
+        quantity = 2
+        for product in response.json()[:2]:
+            order_items.append(
+                {"product_info": product['id'], "quantity": quantity}
+            )
+            price += product['price'] * quantity
+        response = user_client.post(
+            '/basket',
+            data=json.dumps(order_items),
+            content_type='application/json',
+        )
+        return response.status_code
+    return create_basket_
 
 
 @pytest.fixture
-def shop(owner):
+def u_client_with_contacts(user_client) -> Client:
+    """Клиент с контактами."""
+    user_client.post('/user/contact/', data=user_contacts)
+    return user_client
+
+
+@pytest.fixture
+def order(u_client_with_contacts: Client, create_basket) -> dict:
+    """Создает заказ."""
+    create_basket(u_client_with_contacts)
+    response = u_client_with_contacts.get('/user/contact/')
+    contact_id = response.json()['results'][0]['id']
+    response = u_client_with_contacts.post(
+        '/order', data={"contact": contact_id}
+    )
+    return response.json()
+
+
+@pytest.fixture
+def owner_client(client: Client) -> Client:
+    """Клиент с правами поставщика."""
+    client.post('/user/register', data=owner_data)
+    mail_message = [
+        mail for mail in mail.outbox if owner_data['email'] in mail.to
+    ][0].message()
+    confirm_url = str(mail_message).strip().split('\n')[-1]
+    client.get(confirm_url)
+    User.objects.filter(email=owner_data['email']).update(type="shop")
+    response = client.post('/user/login', data=owner_login_data)
+    owner_client = APIClient()
+    owner_client.credentials(
+        HTTP_AUTHORIZATION=f'Token {response.json().get("Token")}',
+        HTTP_CONTENT_TYPE="Application/json",
+    )
+    return owner_client
+
+
+@pytest.fixture
+def shop(owner_client):
+    owner = User.objects.filter(email=owner_data['email']).first()
     return Shop.objects.create(
         **{"name": "Связной", "user": owner, "state": True}
     )
@@ -117,7 +171,7 @@ def products(categories) -> list[Product]:
 
 @pytest.fixture
 def products_info(products) -> list[ProductInfo]:
-    shop = Shop.objects.filter(id=1).first()
+    shop = Shop.objects.filter(name="Связной").first()
     pi1 = ProductInfo.objects.create(
         **{
             "model": "apple/iphone/xs-max",

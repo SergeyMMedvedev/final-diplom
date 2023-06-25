@@ -6,7 +6,13 @@ from tests.common import (
 )
 
 
-class Test04Products:
+class Test05Products:
+    """
+    Тестируется возможность поиска товаров.
+
+    Используется:
+     - ProductInfoView
+    """
     @pytest.mark.django_db(transaction=True)
     def test_01_get_products(self, client: Client, productparameter) -> None:
         """Получить список продуктов."""

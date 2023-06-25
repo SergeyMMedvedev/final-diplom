@@ -23,7 +23,9 @@ from api.views import (
 )
 
 router = DefaultRouter()
+router.register(r'user/contact', ContactView, basename='user-contact')
 router.register(r'user', AccountDetails, basename='user-details')
+
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -36,7 +38,6 @@ urlpatterns = [
         ConfirmAccount.as_view(),
         name='user-register-confirm',
     ),
-    path('user/contact', ContactView.as_view(), name='user-contact'),
     path('user/login', LoginAccount.as_view(), name='user-login'),
     path(
         'user/password_reset',

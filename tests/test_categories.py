@@ -7,6 +7,12 @@ from tests.common import (
 
 
 class Test03Categories:
+    """
+    Тестируется возможность просмотра категорий.
+    
+    Используется:
+     - CategoryView
+    """
     @pytest.mark.django_db(transaction=True)
     def test_01_get_categories(self, client: Client, categories) -> None:
         """Получить список категорий товаров."""

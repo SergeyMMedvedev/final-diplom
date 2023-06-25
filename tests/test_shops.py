@@ -7,6 +7,12 @@ from tests.common import (
 
 
 class Test04Shops:
+    """
+    Тестируется возможность просмотра списка магазинов.
+
+    Используется:
+     - ShopView
+    """
     @pytest.mark.django_db(transaction=True)
     def test_01_get_shops(self, client: Client, shop) -> None:
         """Получить список магазинов."""

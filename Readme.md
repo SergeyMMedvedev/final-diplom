@@ -35,7 +35,7 @@ Url может меняться
 
 
 
+docker-compose up
+docker exec -it orders pytest
 
-
-
-
+For more information, see the [contributor guide index](https://github.com/SergeyMMedvedev/final-diplom/test_doc.md).
