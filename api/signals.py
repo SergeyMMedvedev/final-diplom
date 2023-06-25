@@ -48,7 +48,7 @@ def new_user_registered_signal(user_id, **kwargs) -> None:
 
     msg = EmailMultiAlternatives(
         # title:
-        f"Password Reset Token for {token.user.email}",
+        f"Password Token for {token.user.email}",
         # message:
         (f'Перейдите по ссылке для подтверждения:\n'
          f'{settings.SERVER_HOST}user/register/confirm'

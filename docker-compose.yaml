@@ -18,9 +18,9 @@ services:
     depends_on:
       - postgresql
     volumes:
-      - ./build:/project/build
-      - ./static:/project/static
-      - ./media:/project/media
+      - ./build:/code/build
+      - ./static:/code/static
+      - ./media:/code/media
     env_file:
       - ./.env
 

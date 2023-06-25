@@ -54,12 +54,15 @@ class UserManager(BaseUserManager):
         """Create superuser."""
         for param in ['is_staff', 'is_superuser', 'is_active']:
             extra_fields.setdefault(param, True)
+        extra_fields.setdefault('type', 'shop')
         if extra_fields.get('is_staff') is not True:
             raise ValueError('Superuser must have is_staff=True.')
         if extra_fields.get('is_superuser') is not True:
             raise ValueError('Superuser must have is_superuser=True.')
         if extra_fields.get('is_active') is not True:
             raise ValueError('Superuser must have is_active=True.')
+        if extra_fields.get('type') != 'shop':
+            raise ValueError('Superuser must have type=shop.')
         return self._create_user(email, password, **extra_fields)
 
 

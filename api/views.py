@@ -11,10 +11,14 @@ from requests import get
 from rest_framework import mixins, status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import (
+    CreateAPIView,
+    GenericAPIView,
+    ListAPIView,
+    ListCreateAPIView,
+)
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
-from rest_framework.views import APIView
 from yaml import Loader
 from yaml import load as load_yaml
 
@@ -50,14 +54,15 @@ from api.signals import new_order, new_user_registered
 from .permissions import IsAuthenticated, IsShopOwner
 
 
-class RegisterAccount(APIView):
+class RegisterAccount(CreateAPIView):
     """Для регистрации покупателей."""
 
     throttle_classes = [UserRateThrottle]
+    serializer_class = UserCreateSerializer
 
     def post(self, request) -> Response:
         """Регистрация методом POST."""
-        user_serializer = UserCreateSerializer(data=request.data)
+        user_serializer = self.get_serializer(data=request.data)
         if user_serializer.is_valid():
             user = user_serializer.save()
             user.set_password(request.data['password'])
@@ -71,7 +76,7 @@ class RegisterAccount(APIView):
             )
 
 
-class ConfirmAccount(APIView):
+class ConfirmAccount(ListAPIView):
     """Класс для подтверждения почтового адреса."""
 
     throttle_classes = [UserRateThrottle]
@@ -106,14 +111,15 @@ class ConfirmAccount(APIView):
             )
 
 
-class LoginAccount(APIView):
+class LoginAccount(CreateAPIView):
     """Класс для авторизации пользователей."""
 
     throttle_classes = [UserRateThrottle]
+    serializer_class = UserLoginSerializer
 
     def post(self, request) -> Response:
         """Авторизация методом POST."""
-        user_serializer = UserLoginSerializer(data=request.data)
+        user_serializer = self.get_serializer(data=request.data)
         if not user_serializer.is_valid():
             return Response(
                 {'Status': False, 'Errors': user_serializer.errors},
@@ -171,7 +177,7 @@ class AccountDetails(
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class PartnerUpdate(APIView):
+class PartnerUpdate(CreateAPIView):
     """Класс для обновления прайса от поставщика."""
 
     permission_classes = [IsAuthenticated, IsShopOwner]  # noqa: F811
@@ -249,10 +255,11 @@ class ShopView(ListAPIView):
     serializer_class = ShopSerializer
 
 
-class ProductInfoView(APIView):
+class ProductInfoView(ListAPIView):
     """Класс для поиска товаров."""
 
     throttle_classes = [UserRateThrottle]
+    serializer_class = ProductInfoSerializer
 
     def get(self, request, *args, **kwargs) -> Response:
         """Получить товары."""
@@ -307,15 +314,16 @@ class ContactView(viewsets.ModelViewSet):
         serializer.save(user=user)
 
 
-class PartnerState(APIView):
+class PartnerState(ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsShopOwner]  # noqa: F811
     throttle_classes = [UserRateThrottle]
+    serializer_class = ShopSerializer
     """Класс для работы со статусом поставщика."""
 
     def get(self, request, *args, **kwargs) -> Response:
         """Получить текущий статус."""
         shop = request.user.shop
-        serializer = ShopSerializer(shop)
+        serializer = self.get_serializer(shop)
         return Response(serializer.data)
 
     def post(self, request) -> Response:
@@ -324,7 +332,7 @@ class PartnerState(APIView):
         data = {**request.data, "name": request.user.shop.name}
         if not isinstance(state, bool):
             data['state'] = strtobool(state)
-        serializer = ShopSerializer(data=data)  # type: ignore
+        serializer = self.get_serializer(data=data)  # type: ignore
         if not serializer.is_valid():
             return Response(
                 {'Status': False, 'Errors': serializer.errors},
@@ -334,11 +342,12 @@ class PartnerState(APIView):
         return Response({'Status': True})
 
 
-class BasketView(APIView):
+class BasketView(GenericAPIView):
     """Класс для работы с корзиной пользователя."""
 
     permission_classes = [IsAuthenticated]  # noqa: F811
     throttle_classes = [UserRateThrottle]
+    serializer_class = OrderSerializer
 
     def get(self, request, *args, **kwargs) -> Response:
         """получить корзину."""
@@ -357,7 +366,7 @@ class BasketView(APIView):
             .distinct()
             .first()
         )
-        serializer = OrderSerializer(basket)
+        serializer = self.get_serializer(basket)
         return Response(serializer.data)
 
     def post(self, request, *args, **kwargs) -> Response:
@@ -430,11 +439,12 @@ class BasketView(APIView):
         )
 
 
-class PartnerOrders(APIView):
+class PartnerOrders(ListAPIView):
     """Класс для получения заказов поставщиками."""
 
     permission_classes = [IsAuthenticated, IsShopOwner]  # noqa: F811
     throttle_classes = [UserRateThrottle]
+    serializer_class = OrderSerializer
 
     def get(self, request, *args, **kwargs) -> Response:
         """Get Partner Orders."""
@@ -456,17 +466,18 @@ class PartnerOrders(APIView):
             )
             .distinct()
         )
-        serializer = OrderSerializer(order, many=True)
+        serializer = self.get_serializer(order, many=True)
         return Response(serializer.data)
 
 
-class OrderView(APIView):
+class OrderView(ListCreateAPIView):
     """Класс для получения и размещения заказов пользователями."""
 
     permission_classes = [
         IsAuthenticated,
     ]  # noqa: F811
     throttle_classes = [UserRateThrottle]
+    serializer_class = OrderSerializer
 
     def get(self, request, *args, **kwargs) -> Response:
         """получить мои заказы."""
@@ -486,7 +497,7 @@ class OrderView(APIView):
             )
             .distinct()
         )
-        serializer = OrderSerializer(order, many=True)
+        serializer = self.get_serializer(order, many=True)
         return Response(serializer.data)
 
     def post(self, request, *args, **kwargs) -> Response:
